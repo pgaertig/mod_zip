@@ -16,8 +16,10 @@ ngx_http_zip_file_init(ngx_http_zip_file_t *parsing_file)
 
     parsing_file->crc32 = 0;
     parsing_file->size = 0;
+    parsing_file->unix_time = 0;
 
     parsing_file->missing_crc32 = 0;
+    parsing_file->has_timestamp = 0;
     parsing_file->need_zip64 = 0;
     parsing_file->need_zip64_offset = 0;
     parsing_file->is_directory = 0;
@@ -124,6 +126,10 @@ ngx_http_zip_parse_request(ngx_http_zip_ctx_t *ctx)
         action size_incr {
             parsing_file->size = parsing_file->size * 10 + (fc - '0');
         }
+        action timestamp_incr {
+            parsing_file->unix_time = parsing_file->unix_time * 10 + (fc - '0');
+            parsing_file->has_timestamp = 1;
+        }
         action crc_incr {
             if (fc == '-') {
                 ctx->missing_crc32 = 1;
@@ -144,6 +150,7 @@ ngx_http_zip_parse_request(ngx_http_zip_ctx_t *ctx)
         file_spec = ( [0-9a-fA-F]+ | "-" ) >start_file $crc_incr
                   " "+
                   [0-9]+ $size_incr
+                  ( "@" [0-9]+ $timestamp_incr )?
                   " "+
                   (
                     [^? ]+ >start_uri %end_uri

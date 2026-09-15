@@ -26,6 +26,7 @@ typedef struct {
     unsigned    header_sent:1;
     unsigned    trailer_sent:1;
     unsigned    missing_crc32:1;
+    unsigned    has_timestamp:1;
     unsigned    need_zip64:1;
     unsigned    need_zip64_offset:1;
     unsigned    is_directory:1;

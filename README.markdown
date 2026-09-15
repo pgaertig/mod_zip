@@ -36,14 +36,16 @@ upstream) includes the following HTTP header:
     X-Archive-Files: zip
 
 It then scans the response body for a list of files. The syntax is a 
-space-separated list of the file checksum (CRC-32), size (in bytes), location
-(properly URL-encoded), and file name. One file per line.  The file location
-corresponds to a location in your nginx.conf; the file can be on disk, from an
-upstream, or from another module.  The file name can include a directory path,
-and is what will be extracted from the ZIP file. Example:
+space-separated list of the file checksum (CRC-32), size (in bytes), optional
+timestamp (in seconds, UTC), location (properly URL-encoded), and file name. One
+file per line.  The file location corresponds to a location in your nginx.conf;
+the file can be on disk, from an upstream, or from another module.  The file
+name can include a directory path, and is what will be extracted from the ZIP
+file. Example:
 
     1034ab38 428    /foo.txt   My Document1.txt
     83e8110b 100339 /bar.txt   My Other Document1.txt
+    5d70c4d3 25@1694500000 /baz.txt My Timestamped Document1.txt
     0        0      @directory My empty directory
 
 Files are retrieved and encoded in order. If a file cannot be found or the file
@@ -51,6 +53,10 @@ request returns any sort of error, the download is aborted.
 
 The CRC-32 is optional. Put "-" if you don't know the CRC-32; note that in this
 case mod_zip will disable support for the `Range` header.
+
+The timestamp is optional. Put "@" and the timestamp after the size; when it is
+missing, the file is stamped with the time of the request, which can drift
+between `Range` requests.
 
 A special URL marker `@directory` can be used to declare a directory entry
 within an archive. This is very convenient when you have to package a tree of

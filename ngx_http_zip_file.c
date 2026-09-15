@@ -311,8 +311,12 @@ ngx_http_zip_generate_pieces(ngx_http_request_t *r, ngx_http_zip_ctx_t *ctx)
     for (piece_i = i = 0; i < ctx->files.nelts; i++) {
         file = &((ngx_http_zip_file_t *)ctx->files.elts)[i];
         file->offset = offset;
-        file->unix_time = unix_time;
-        file->dos_time = dos_time;
+        if (!file->has_timestamp) {
+            file->unix_time = unix_time;
+            file->dos_time = dos_time;
+        } else {
+            file->dos_time = ngx_dos_time(file->unix_time);
+        }
 
         if(ctx->unicode_path) {
 #ifdef NGX_ZIP_HAVE_ICONV

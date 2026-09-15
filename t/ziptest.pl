@@ -2,9 +2,10 @@
 
 # TODO tests for Zip64
 
-use Test::More tests => 121;
+use Test::More tests => 131;
 use LWP::UserAgent;
 use Archive::Zip;
+use Time::Local;
 
 $temp_zip_path = "/tmp/mod_zip.zip";
 $http_root = "http://localhost:8081";
@@ -56,6 +57,18 @@ sub write_temp_zip($) {
     close TEMPFILE;
 
     return Archive::Zip->new($temp_zip_path);
+}
+
+sub dos_time_to_unix($) {
+    my $dos_time = shift;
+
+    return timegm(
+        ($dos_time & 0x1f) << 1,
+        ($dos_time >> 5) & 0x3f,
+        ($dos_time >> 11) & 0x1f,
+        ($dos_time >> 16) & 0x1f,
+        (($dos_time >> 21) & 0x0f) - 1,
+        (($dos_time >> 25) & 0x7f) + 1980 );
 }
 
 sub test_zip_archive($$) {
@@ -153,6 +166,26 @@ is($zip->numberOfMembers(), 3, "Correct number in spaces and plus ZIP");
 
 $response = $ua->get("$http_root/zip-internal-location.txt");
 is($response->code, 200, "Returns OK with internal locations");
+
+########## Timestamps
+
+set_debug_log("zip-timestamp");
+
+# file1.txt, file2.txt and empty_dir1/, timestamps do not change the size
+$zip_timestamp_length = 423;
+
+$response = $ua->get("$http_root/zip-timestamp.txt");
+is($response->code, 200, "Returns OK with timestamps");
+$zip = test_zip_archive($response->content, "with timestamps");
+is(dos_time_to_unix($zip->memberNamed("file1.txt")->lastModFileDateTime()), 1694500000, "file1.txt has timestamp from file list");
+cmp_ok(abs(dos_time_to_unix($zip->memberNamed("file2.txt")->lastModFileDateTime()) - time()), "<", 120, "file2.txt has current time");
+is($zip->memberNamed("empty_dir1/")->isDirectory(), 1, "empty_dir1 exists in archive with timestamps");
+is(dos_time_to_unix($zip->memberNamed("empty_dir1/")->lastModFileDateTime()), 1694600000, "empty_dir1 has timestamp from file list");
+is($response->header("Content-Length"), $zip_timestamp_length, "Content-Length header with timestamps");
+
+$response = $ua->get("$http_root/zip-timestamp.txt", "Range" => "bytes=0-1");
+is($response->code, 206, "206 Partial Content");
+is($response->header("Content-Range"), "bytes 0-1/$zip_timestamp_length", "Content-Range header with timestamps");
 
 ########## Package empty directories
 
