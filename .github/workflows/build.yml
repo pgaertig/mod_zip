@@ -1,6 +1,40 @@
 name: build
 on: [ push, pull_request ]
 jobs:
+  # Regenerates ngx_http_zip_parsers.c from ngx_http_zip_parsers.rl with Ragel 7 and fails
+  # when the result differs from the committed file, so the grammar and the generated parser
+  # cannot drift apart. On failure the regenerated file is uploaded as a build artifact.
+  parser-check:
+    runs-on: ubuntu-latest
+    # ngx_http_zip_parsers.c is generated with Ragel 7, Ubuntu only ships Ragel 6
+    container: fedora:44
+    steps:
+      # Prepare environment
+      - name: Install Ragel 7
+        run: dnf install -y ragel diffutils
+      - uses: actions/checkout@v2
+      - name: Ragel version
+        run: ragel --version
+
+      # Generate outside the tree, the file name ends up in #line directives
+      - name: Generate parser
+        run: |
+          mkdir -p /tmp/ragel
+          cp ngx_http_zip_parsers.rl /tmp/ragel/
+          cd /tmp/ragel && ragel -o ngx_http_zip_parsers.c ngx_http_zip_parsers.rl
+
+      # Fails when the committed parser does not match its grammar
+      - name: Compare with committed parser
+        run: diff -u ngx_http_zip_parsers.c /tmp/ragel/ngx_http_zip_parsers.c
+
+      # Upload workflow run result artifact for further inspection
+      - name: Upload regenerated parser code
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ngx_http_zip_parsers.c
+          path: /tmp/ragel/ngx_http_zip_parsers.c
+
   linux:
     runs-on: ubuntu-latest
     strategy:
@@ -8,7 +42,7 @@ jobs:
       matrix:
         mode: [ static, dynamic ]
         compiler: [ gcc, clang ]
-        version: [ 1.22.1, 1.24.0, 1.26.3, 1.28.0, 1.29.1 ]
+        version: [ 1.22.1, 1.24.0, 1.26.3, 1.28.0, 1.30.4, 1.31.5 ]
     steps:
       # Prepare environment
       - name: Install carton
